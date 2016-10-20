@@ -92,9 +92,10 @@ class HestonModel(object):
         """ Price of the Call Contract
         """
         def integrand(w):
-            return(self.__call_integrand__(w, maturity, strike))
-        integral=sc.integrate.quad(integrand, 0, 100)[0]
-        return(self.init-0.5*strike*np.exp(-self.rate*maturity)-strike*np.exp(-self.rate*maturity)*1/np.pi*integral)
+            return(np.exp(-1j*w*np.log(strike*np.exp(-self.rate*maturity)/self.init))*(self.characteristic_function(w-1j, maturity)-1)/(1j*w*(1+1j*w)))
+        integral=sc.integrate.quad(integrand, -100, 100)[0]
+        res=0.5*self.init/np.pi*integral+np.max(0, self.init-strike*np.exp(-self.rate*maturity))
+        return(res)
 
 
     def put_price(self, maturity, strike):
@@ -110,7 +111,8 @@ class HestonModel(object):
         """
         gamma = np.sqrt(self.volatility.vol_of_vol**2*(w*w+1j*w)+(self.volatility.speed-1j*self.correlation*self.volatility.vol_of_vol*w)**2)
         d=-(w*w+1j*w)/(gamma*1/np.tanh(0.5*gamma*maturity)+self.volatility.speed-1j*self.correlation*self.volatility.vol_of_vol*w)
-        c=
+        c=self.volatility.speed*maturity*(self.volatility.speed-1j*self.correlation*self.volatility.vol_of_vol*w-gamma)/(self.volatility.vol_of_vol**2)
+        c=c-2*self.volatility.speed/(self.volatility.vol_of_vol**2)*np.log(0.5*(1+np.exp(-gamma*maturity))+0.5*(self.volatility.speed-1j*self.correlation*self.volatility.vol_of_vol*w)*(1-np.exp(-gamma*maturity))/gamma)
         return(np.exp(self.volatility.target*c+self.volatility.init*d))
 
 
