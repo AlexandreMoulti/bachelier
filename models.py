@@ -4,8 +4,47 @@ import pandas as pd
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 
+
+class Vasicek(object):
+    """ VASICEK model
+        mean reverting normal distributed process
+    """
+    def __init__(self, init, target, speed, vol):
+        self.init   = init
+        self.target = target
+        self.speed  = speed
+        self.vol    = vol
+
+    def mean(self, maturity, init=None):
+        if not(init):
+            init=self.init
+        return( init*np.exp(-self.speed*maturity) + self.target*(1-np.exp(-self.speed*maturity)) )
+
+    def variance(self, maturity, init=None):
+        if not(init):
+            init=self.init
+        return( self.vol**2/(2*self.speed)*(1-np.exp(-2*self.speed*maturity)) )
+
+    def generate_brownian(self, maturity, nb_simulations, nb_steps):
+        """ Generates normalized brownian increments
+        """
+        self.dB = np.random.normal(loc=0, scale=1, size=(nb_simulations, nb_steps*maturity))
+
+    def simuate(self, maturity, nb_simulations, nb_steps):
+        """ Simulation via explicit solution
+        """
+        self.generate_brownian(maturity, nb_simulations, nb_steps)
+        res       = np.zeros((nb_simulations, nb_steps*maturity+1))
+        res[:, 0] = self.init
+        dt        = 1.0/nb_steps
+        for j in range(res.shape[1]-1):
+            res[:,j+1]=res[:,j]+self.speed*(self.target-res[:,j])*self.dB[:,j]
+        self.sim = res
+
+
 class CIR(object):
-    """COX INGERSOL ROSS model
+    """ COX INGERSOL ROSS model
+        mean reverting positive process
     """
     def __init__(self, init, target, speed, vol_of_vol):
         self.init       = init
@@ -13,16 +52,20 @@ class CIR(object):
         self.speed      = speed
         self.vol_of_vol = vol_of_vol
 
-    def mean(self, init, dt):
-        """ mean of the process at time t
+    def mean(self, maturity, init=None):
+        """ mean of the process at maturity when initial point is init
         """
-        return(self.target+(init-self.target)*np.exp(-self.speed*dt))
+        if not(init):
+            init=self.init
+        return(self.target+(init-self.target)*np.exp(-self.speed*maturity))
 
-    def variance(self, init, dt):
-        """ variance of the process at time t
+    def variance(self, maturity, init=None):
+        """ variance of the process at maturity when initial point is init
         """
-        res = init*self.vol_of_vol*self.vol_of_vol*np.exp(-self.speed*dt)*(1-np.exp(-self.speed*dt))/self.speed
-        res = res + 0.5*self.target*self.vol_of_vol*self.vol_of_vol*(1-np.exp(-self.speed*dt))**2/self.speed
+        if not(init):
+            init=self.init
+        res = init*self.vol_of_vol*self.vol_of_vol*np.exp(-self.speed*maturity)*(1-np.exp(-self.speed*maturity))/self.speed
+        res = res + 0.5*self.target*self.vol_of_vol*self.vol_of_vol*(1-np.exp(-self.speed*maturity))**2/self.speed
         return(res)
 
     def generate_brownian(self, maturity, nb_simulations, nb_steps):
@@ -42,8 +85,8 @@ class CIR(object):
         dt        = 1.0/nb_steps
         for j in range(res.shape[1]-1):
             for i in range(res.shape[0]):
-                m  = self.mean(res[i,j], dt)
-                s2 = self.variance(res[i,j], dt)
+                m  = self.mean(dt, res[i,j])
+                s2 = self.variance(dt, res[i,j])
                 psi = s2/(m*m)
                 if (psi<1.5):
                     b2  = 2/psi-1+np.sqrt(2/psi*(1/psi-1))
@@ -111,9 +154,11 @@ class HestonModel(object):
         k3        = gamma1*dt*(1-self.correlation**2)
         k4        = gamma2*dt*(1-self.correlation**2)
         for j in range(res.shape[1]-1):
-            res[:,j+1]=res[:,j]*np.exp( (self.rate-self.dividend)*dt+
+            res[:,j+1]=res[:,j]*np.exp(
+                                        (self.rate-self.dividend)*dt+
                                         k0+k1*self.volatility.sim[:,j]+k2*self.volatility.sim[:,j+1]
-                                        +np.sqrt(k3*self.volatility.sim[:,j]+k4*self.volatility.sim[:,j+1])*dB[:,j])
+                                        +np.sqrt(k3*self.volatility.sim[:,j]+k4*self.volatility.sim[:,j+1])*dB[:,j]
+                                       )
         self.sim = res
 
     def call_price(self, maturity, strike):
