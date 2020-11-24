@@ -63,7 +63,7 @@ class Vasicek(object):
         return(self.simulations)
 
     def __theoretical_mean__(self, target_time):
-        res = np.exp(-self.speed*(target_time-self.duree_palier))*self.initial + self.target*(1-np.exp(-self.speed*(target_time-self.duree_palier)))
+        res = np.exp(-self.speed*target_time)*self.initial + self.target*(1-np.exp(-self.speed*target_time))
         return(res)
 
     def __theoretical_variance__(self, target_time):
